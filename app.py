@@ -8,6 +8,8 @@ to an in-memory generated demo dataset — no file on disk is ever required, so
 there's no fixed file path to break.
 """
 
+import io
+
 import numpy as np
 import pandas as pd
 import plotly.express as px
@@ -28,9 +30,15 @@ h1 {
 }
 div[data-testid="stMetric"] {
     background: #181920; border: 1px solid #262730; border-radius: 12px;
-    padding: 14px 16px;
+    padding: 18px 20px; margin-bottom: 8px; min-height: 96px;
 }
-div[data-testid="stMetricLabel"] { opacity: 0.75; }
+div[data-testid="stMetricLabel"] {
+    opacity: 0.8; font-size: 0.9rem; overflow: visible; white-space: normal;
+}
+div[data-testid="stMetricValue"] {
+    font-size: 1.7rem !important; overflow-wrap: break-word; white-space: normal;
+}
+div[data-testid="column"] { padding: 0 8px; }
 </style>
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
@@ -92,14 +100,20 @@ def load_demo_data() -> pd.DataFrame:
     return generate_sample_data()
 
 
-def read_uploaded_file(uploaded_file) -> pd.DataFrame:
-    name = uploaded_file.name.lower()
+def read_uploaded_file(file_bytes: bytes, file_name: str) -> pd.DataFrame:
+    buffer = io.BytesIO(file_bytes)
+    name = file_name.lower()
     if name.endswith(".csv"):
-        return pd.read_csv(uploaded_file)
+        return pd.read_csv(buffer)
     elif name.endswith((".xlsx", ".xls")):
-        return pd.read_excel(uploaded_file)
+        return pd.read_excel(buffer)
     else:
         raise ValueError("Unsupported file type — please upload a .csv or .xlsx file.")
+
+
+@st.cache_data(show_spinner="Reading your file...")
+def read_uploaded_file_cached(file_bytes: bytes, file_name: str) -> pd.DataFrame:
+    return read_uploaded_file(file_bytes, file_name)
 
 # ----------------------------------------------------------------------
 # SIDEBAR — DATA SOURCE
@@ -115,7 +129,7 @@ with st.sidebar:
             st.session_state._file_key = file_key
             st.session_state.pop("mapping_confirmed", None)
         try:
-            raw_df = read_uploaded_file(uploaded_file)
+            raw_df = read_uploaded_file_cached(uploaded_file.getvalue(), uploaded_file.name)
             using_demo = False
         except Exception as e:
             st.error(f"Couldn't read that file: {e}")
@@ -254,15 +268,26 @@ total_sales = fdf["Sales"].sum()
 total_orders = fdf["Order ID"].nunique()
 avg_order_value = total_sales / total_orders if total_orders else 0
 
-kpi_cols = st.columns(5 if HAS["Profit"] else 3)
-kpi_cols[0].metric("Total Sales", f"₹{total_sales/1e7:,.2f} Cr" if total_sales >= 1e7 else f"₹{total_sales:,.0f}")
-kpi_cols[1].metric("Total Orders", f"{total_orders:,}")
-kpi_cols[2].metric("Avg Order Value", f"₹{avg_order_value:,.0f}")
+
+def fmt_currency(v: float) -> str:
+    if abs(v) >= 1e7:
+        return f"₹{v/1e7:,.2f} Cr"
+    elif abs(v) >= 1e5:
+        return f"₹{v/1e5:,.2f} L"
+    return f"₹{v:,.0f}"
+
+
+row1 = st.columns(3)
+row1[0].metric("💰 Total Sales", fmt_currency(total_sales))
+row1[1].metric("🧾 Total Orders", f"{total_orders:,}")
+row1[2].metric("📦 Avg Order Value", fmt_currency(avg_order_value))
+
 if HAS["Profit"]:
     total_profit = fdf["Profit"].sum()
     margin_pct = (total_profit / total_sales * 100) if total_sales else 0
-    kpi_cols[3].metric("Total Profit", f"₹{total_profit/1e7:,.2f} Cr" if total_profit >= 1e7 else f"₹{total_profit:,.0f}")
-    kpi_cols[4].metric("Profit Margin", f"{margin_pct:.1f}%")
+    row2 = st.columns(2)
+    row2[0].metric("📈 Total Profit", fmt_currency(total_profit))
+    row2[1].metric("🎯 Profit Margin", f"{margin_pct:.1f}%")
 
 st.markdown("---")
 
