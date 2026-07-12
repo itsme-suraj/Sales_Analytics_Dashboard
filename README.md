@@ -1,8 +1,9 @@
 # 📊 Retail Sales Analytics Dashboard
 
-An interactive sales analytics dashboard for a (synthetic) Indian retail business —
-built to demonstrate the full data analyst workflow: data generation/cleaning, KPI
-design, interactive filtering, segment/cohort analysis, and a lightweight forecast.
+An interactive sales analytics dashboard that accepts **your own CSV or Excel
+sales data** (auto-detects columns) or falls back to a realistic synthetic
+demo dataset. Built to demonstrate the full data analyst workflow: data
+cleaning, KPI design, interactive filtering, segment analysis, and forecasting.
 
 **🔗 Live demo:** _add your Streamlit Cloud link here after deploying_
 
@@ -12,25 +13,33 @@ design, interactive filtering, segment/cohort analysis, and a lightweight foreca
 
 | Skill | Where |
 |---|---|
-| Data modeling / cleaning | `data/generate_data.py` — realistic transaction structure with seasonality |
-| KPI design | Total Sales, Profit, Orders, AOV, Margin % cards |
+| Data ingestion from real files | CSV/Excel upload with `pd.read_csv` / `pd.read_excel` |
+| Data cleaning at scale | Currency-symbol stripping, mixed date-format parsing, missing-value handling |
+| Schema flexibility | Auto-detects columns by name (e.g. "Total Amount" → Sales) so it works on *any* sales file, not just one dataset |
+| KPI design | Total Sales, Profit, Orders, AOV, Margin % — computed conditionally based on what's available |
 | Interactive filtering | Date range, Region, Category, Segment — all cross-filter every chart |
 | Business storytelling | Written insights under each chart, not just raw numbers |
-| Segment/cohort analysis | Customer segment, payment mode, top-customer breakdowns |
 | Time series analysis | Monthly trend + weekday×category seasonality heatmap |
-| Basic forecasting | 3-month linear trend projection (Forecast tab) |
+| Basic forecasting | 3-month linear trend projection |
 | Dashboard engineering | Streamlit + Plotly, cached data loading, clean dark UI |
 
-## About the dataset
+## How the upload feature works
 
-The data is **synthetic but realistically modeled** — 11,000 transactions spanning
-2023–2025 across 4 Indian regions, 5 product categories, and 5 payment modes
-(UPI, Cards, Net Banking, COD), with real-world seasonality baked in: spikes around
-Diwali, the Republic Day sale, and End-of-Season Sale periods, plus a deliberate
-"heavy discounts erode margin" pattern for the Products tab to surface. This was a
-deliberate choice over reusing the generic Kaggle Superstore dataset that appears in
-thousands of portfolios — see `data/generate_data.py` for exactly how it's built,
-which is worth walking an interviewer through directly.
+1. Upload a `.csv` or `.xlsx` file with sales data (any column names)
+2. The app guesses which of your columns are Date, Sales, Profit, Category,
+   Region, Customer, etc. by matching common naming patterns
+3. You confirm or correct the mapping in the sidebar, then click **"Apply
+   mapping & analyze"**
+4. Only **Date** and **Sales** are required — every other field (Profit,
+   Category, Region, Customer, Segment, Payment Mode...) is optional, and the
+   dashboard automatically shows/hides charts based on what's actually present
+   in your file
+
+If you don't upload anything, the dashboard shows a **demo dataset**: 11,000
+synthetic but realistically-modeled Indian retail transactions (2023–2025)
+with festive seasonality (Diwali, Republic Day sale, EOSS) baked in — see
+`sample_data.py` for exactly how it's generated, fully in-memory (no CSV file
+on disk, so there's nothing that can go missing on deploy).
 
 ## Run it locally
 
@@ -41,26 +50,21 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-The dataset (`data/sales_data.csv`) is already generated and committed, so the app
-works immediately. To regenerate it (e.g. with a different random seed or bigger
-size), run `python data/generate_data.py`.
-
 ## Deploy on Streamlit Community Cloud (free)
 
-1. Push this repo to GitHub
-2. Go to https://share.streamlit.io → **New app** → pick the repo, branch `main`,
-   file `app.py`
-3. Deploy — no secrets/API keys needed, this project is fully self-contained
+1. Push this repo to GitHub — **keep the flat structure below**, don't nest
+   files in extra folders
+2. Go to https://share.streamlit.io → **New app** → pick the repo, branch
+   `main`, file `app.py`
+3. Deploy — no secrets/API keys needed
 4. Copy the live `*.streamlit.app` URL into this README and your resume/portfolio
 
 ## Project structure
 
 ```
 sales-dashboard/
-├── app.py                  # the dashboard
-├── data/
-│   ├── generate_data.py    # dataset generation logic (talk through this in interviews)
-│   └── sales_data.csv      # the generated dataset (committed)
+├── app.py                  # the dashboard (upload + auto-analyze + charts)
+├── sample_data.py          # in-memory demo data generator (no file path needed)
 ├── requirements.txt
 ├── .streamlit/config.toml  # dark theme
 └── README.md
@@ -71,19 +75,18 @@ sales-dashboard/
 - Swap the linear-trend forecast for Prophet or SARIMA with proper seasonality decomposition
 - Add a customer RFM (Recency/Frequency/Monetary) segmentation tab
 - Add a cohort retention analysis (repeat purchase rate by signup month)
-- Connect to a real database (Postgres/BigQuery) instead of a static CSV, and add
-  `st.cache_data(ttl=...)` for live-refreshing data
+- Persist uploaded data to a database instead of re-uploading each session
 - Add anomaly detection on daily sales (flag unusual spikes/drops automatically)
 
 ---
 
 ### Talking points for interviews
 
-- **"Walk me through your process"** → data generation → cleaning/typing → KPI
-  definition → chart selection reasoning → insight writing.
-- **"Why these charts?"** → line chart for trend (time-series), heatmap for two
-  categorical dimensions (weekday × category), pie only for share-of-whole with few
-  categories (region), bar for ranked comparisons (top products).
-- **"What would you do with more time?"** → point to the "Ideas to extend" section
-  above — shows you know the limits of what you built and where real production
-  work would go next.
+- **"How does it handle real-world messy data?"** → walk through the column
+  auto-detection, currency-symbol stripping, and the mixed-date-format bug I
+  specifically had to fix (pandas infers one date format per column and
+  silently drops rows that don't match — parsing row-by-row fixes it).
+- **"Why these charts?"** → line chart for trend (time-series), heatmap for
+  two categorical dimensions (weekday × category), pie only for share-of-whole
+  with few categories (region), bar for ranked comparisons (top products).
+- **"What would you do with more time?"** → see "Ideas to extend" above.
